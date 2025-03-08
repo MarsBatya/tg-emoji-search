@@ -1,7 +1,7 @@
 import esbuild from "esbuild";
 import process from "process";
 import builtins from "builtin-modules";
-import { copy } from "esbuild-copy-static-files";
+import copy from "esbuild-copy-static-files";
 
 const banner =
 	`/*
@@ -23,7 +23,6 @@ esbuild.build({
 		"electron",
 		...builtins],
 	format: "cjs",
-	watch: !prod,
 	target: "es2018",
 	logLevel: "info",
 	sourcemap: prod ? false : "inline",

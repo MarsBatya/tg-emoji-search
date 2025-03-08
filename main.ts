@@ -1,7 +1,21 @@
-import { App, Editor, EditorPosition, EditorSuggest, EditorSuggestContext, EditorSuggestTriggerInfo, MarkdownView, Notice, Plugin, PluginSettingTab, Setting } from 'obsidian';
-import { EmojiSearch } from './pkg/emoji_search_fixed.js'
+import {
+	App,
+	Editor,
+	EditorPosition,
+	EditorSuggest,
+	EditorSuggestContext,
+	EditorSuggestTriggerInfo,
+	MarkdownView,
+	Notice,
+	Plugin,
+	PluginSettingTab,
+	Setting
+} from 'obsidian';
+import init, { EmojiSearch } from './pkg/emoji_search_fixed.js';
 
-// Define interfaces for WebAssembly module
+// --- Type Definitions ---
+type EmojiSearchResult = [string, string[]][];
+
 interface EmojiSearchWasm {
 	new(): EmojiSearch;
 }
@@ -18,9 +32,17 @@ interface EmojiSuggesterPluginSettings {
 const DEFAULT_SETTINGS: EmojiSuggesterPluginSettings = {
 	defaultLanguage: 'english',
 	triggerChar: ':'
+};
+
+const RANDOM_EMOJIS = ['😀', '😂', '🥰', '😎', '🤔', '👍', '🎉', '✨', '🔥', '❤️'];
+
+// --- Helper Functions ---
+function getResourceUrl(app: App, relativePath: string): string {
+	return app.vault.adapter.getResourcePath(relativePath);
 }
 
-export default class EmojiSuggesterPlugin extends Plugin { 
+// --- Main Plugin Class ---
+export default class EmojiSuggesterPlugin extends Plugin {
 	settings: EmojiSuggesterPluginSettings;
 	private emojiSearch: EmojiSearch | null = null;
 
@@ -28,68 +50,57 @@ export default class EmojiSuggesterPlugin extends Plugin {
 		await this.loadSettings();
 
 		try {
-			// Load WebAssembly module directly using fetch
+			// Initialize WASM module using a binary fetch approach
 			await this.loadWasmModule();
-			// Create instance of EmojiSearch
 
+			// Create instance of EmojiSearch and initialize with emoji data
 			this.emojiSearch = new EmojiSearch();
-
-			// Load emoji data from JSON files
 			const emojiData = await this.loadEmojiData();
-
-			// Initialize the search with the loaded data
 			this.emojiSearch.initialize(JSON.stringify(emojiData));
 			console.log('WASM initialized successfully with emoji data');
-
-			// Register editor suggestion
+			// Register editor suggestions using our custom suggester
 			this.registerEditorSuggest(new EmojiSuggester(this.app, this.emojiSearch, this.settings));
 
+			// Uncomment if you want a success notice:
 			// new Notice('Emoji Suggester plugin loaded successfully');
 		} catch (error) {
 			console.error('Failed to initialize WASM:', error);
 			new Notice('Failed to initialize Emoji Suggester plugin');
 		}
 
-		// Add settings tab
+		// Add a settings tab for the plugin
 		this.addSettingTab(new EmojiSuggesterSettingTab(this.app, this));
 
-		// This creates an icon in the left ribbon
-		const ribbonIconEl = this.addRibbonIcon('smile', 'Emoji Suggester', (evt: MouseEvent) => {
-			new Notice('Type ":" followed by a keyword to suggest emojis');
+		// Create a ribbon icon with a tooltip
+		const ribbonIconEl = this.addRibbonIcon('smile', 'Emoji Suggester', () => {
+			new Notice(`Type "${this.settings.triggerChar}" followed by a keyword to suggest emojis`);
 		});
 		ribbonIconEl.addClass('emoji-suggester-ribbon-class');
 
-		// This adds a simple command to insert a random emoji
+		// Add command to insert a random emoji
 		this.addCommand({
 			id: 'insert-random-emoji',
 			name: 'Insert random emoji',
-			editorCallback: (editor: Editor, view: MarkdownView) => {
-				const randomEmojis = ['😀', '😂', '🥰', '😎', '🤔', '👍', '🎉', '✨', '🔥', '❤️'];
-				const randomEmoji = randomEmojis[Math.floor(Math.random() * randomEmojis.length)];
+			editorCallback: (editor: Editor) => {
+				const randomEmoji = RANDOM_EMOJIS[Math.floor(Math.random() * RANDOM_EMOJIS.length)];
 				editor.replaceSelection(randomEmoji);
 			}
 		});
 	}
 
-	// Custom method to load WebAssembly module
 	async loadWasmModule(): Promise<InitOutput> {
 		try {
-			// Import the modified JS file without import.meta
 			const wasmModule = await import('./pkg/emoji_search_fixed.js');
+			const wasmUrl = getResourceUrl(this.app, `${this.manifest.dir}/pkg/emoji_search_bg.wasm`);
 
-			// Path to the .wasm file relative to plugin directory
-			const wasmPath = this.app.vault.adapter.getResourcePath(
-				`${this.manifest.dir}/pkg/emoji_search_bg.wasm`
-			);
-			
-			// Fetch the .wasm file
-			const wasmResponse = await fetch(wasmPath);
+			// Fetch the WASM binary
+			const wasmResponse = await fetch(wasmUrl);
 			if (!wasmResponse.ok) {
-				throw new Error(`Failed to fetch WASM: ${wasmResponse.statusText}`);
+				throw new Error(`Failed to fetch WASM from ${wasmUrl}: ${wasmResponse.statusText}`);
 			}
 			const wasmBytes = await wasmResponse.arrayBuffer();
 
-			// Initialize with the binary .
+			// Initialize the module (using the binary data)
 			return await wasmModule.default(wasmBytes);
 		} catch (error) {
 			console.error('Error loading WASM module:', error);
@@ -99,25 +110,24 @@ export default class EmojiSuggesterPlugin extends Plugin {
 
 	async loadEmojiData(): Promise<{ english: Record<string, string>; russian: Record<string, string> }> {
 		try {
-			// Use fetch to load the JSON files from the plugin directory
-			const englishResponse = await fetch(
-				this.app.vault.adapter.getResourcePath(`${this.manifest.dir}/emoji_data_english.json`)
-			);
-			const russianResponse = await fetch(
-				this.app.vault.adapter.getResourcePath(`${this.manifest.dir}/emoji_data_russian.json`)
-			);
+			const englishUrl = getResourceUrl(this.app, `${this.manifest.dir}/emoji_data_english.json`);
+			const russianUrl = getResourceUrl(this.app, `${this.manifest.dir}/emoji_data_russian.json`);
+
+			const [englishResponse, russianResponse] = await Promise.all([
+				fetch(englishUrl),
+				fetch(russianUrl)
+			]);
 
 			if (!englishResponse.ok || !russianResponse.ok) {
-				throw new Error('Failed to load emoji data files');
+				throw new Error('Failed to load one or more emoji data files');
 			}
 
-			const englishData = await englishResponse.json();
-			const russianData = await russianResponse.json();
+			const [englishData, russianData] = await Promise.all([
+				englishResponse.json(),
+				russianResponse.json()
+			]);
 
-			return {
-				english: englishData,
-				russian: russianData
-			};
+			return { english: englishData, russian: russianData };
 		} catch (error) {
 			console.error('Error loading emoji data:', error);
 			throw error;
@@ -125,11 +135,12 @@ export default class EmojiSuggesterPlugin extends Plugin {
 	}
 
 	onunload() {
-		console.log('Unloading emoji suggester plugin');
+		// Cleanup logic if necessary (e.g., freeing WASM resources)
 	}
 
 	async loadSettings() {
-		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+		// Using spread operator for clarity
+		this.settings = { ...DEFAULT_SETTINGS, ...(await this.loadData() || {}) };
 	}
 
 	async saveSettings() {
@@ -137,6 +148,7 @@ export default class EmojiSuggesterPlugin extends Plugin {
 	}
 }
 
+// --- Editor Suggestion Class ---
 class EmojiSuggester extends EditorSuggest<string> {
 	private emojiSearch: EmojiSearch;
 	private settings: EmojiSuggesterPluginSettings;
@@ -147,42 +159,34 @@ class EmojiSuggester extends EditorSuggest<string> {
 		this.settings = settings;
 	}
 
-	onTrigger(cursor: EditorPosition, editor: Editor, file: any): EditorSuggestTriggerInfo | null {
+	onTrigger(cursor: EditorPosition, editor: Editor): EditorSuggestTriggerInfo | null {
 		const line = editor.getLine(cursor.line);
 		const subString = line.substring(0, cursor.ch);
-
-		// Use the trigger character from settings
 		const escapedTrigger = this.settings.triggerChar.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 		const triggerRegex = new RegExp(`${escapedTrigger}([a-zA-Zа-яА-Я ]*)$`);
-
 		const match = subString.match(triggerRegex);
 		if (!match) return null;
 
 		return {
-			start: {
-				line: cursor.line,
-				ch: subString.lastIndexOf(this.settings.triggerChar)
-			},
+			start: { line: cursor.line, ch: subString.lastIndexOf(this.settings.triggerChar) },
 			end: cursor,
-			query: match[1] || ''
+			query: match[1]?.trim() || ''
 		};
 	}
 
 	getSuggestions(context: EditorSuggestContext): string[] {
-		// Skip searching if the query is empty
-		if (!context.query) return [];
+		if (!context.query || !this.emojiSearch) return [];
 
-		// Detect if the query contains Russian characters
-		const isRussian = /[а-яА-Я]/.test(context.query);
-		const language = isRussian ? "russian" : this.settings.defaultLanguage;
+		// Determine language based on query content
+		const language = /[а-яА-Я]/.test(context.query)
+			? 'russian'
+			: this.settings.defaultLanguage;
 
 		try {
-			// Call Rust WebAssembly search function
-			const results = JSON.parse(this.emojiSearch.search(context.query, language));
-
-			// Use a Map to track unique emojis and their first keyword
+			const results: EmojiSearchResult = JSON.parse(this.emojiSearch.search(context.query, language));
 			const emojiMap = new Map<string, string>();
 
+			// Build a map with the first keyword for each unique emoji
 			for (const [keyword, emojis] of results) {
 				for (const emoji of emojis) {
 					if (!emojiMap.has(emoji)) {
@@ -191,7 +195,6 @@ class EmojiSuggester extends EditorSuggest<string> {
 				}
 			}
 
-			// Return an array of formatted emoji strings
 			return Array.from(emojiMap.entries()).map(
 				([emoji, keyword]) => `${emoji} (${keyword})`
 			);
@@ -202,24 +205,18 @@ class EmojiSuggester extends EditorSuggest<string> {
 	}
 
 	renderSuggestion(value: string, el: HTMLElement): void {
-		// Extract emoji and keyword
 		const matches = value.match(/^(.*) \((.*)\)$/);
 		if (matches) {
-			const emoji = matches[1];
-			const keyword = matches[2];
-
-			// Create a container for better styling
+			const [, emoji, keyword] = matches;
 			const container = document.createElement('div');
 			container.addClass('emoji-suggestion-item');
 
-			// Add emoji with larger font
 			const emojiSpan = document.createElement('span');
 			emojiSpan.addClass('emoji-suggestion-emoji');
 			emojiSpan.style.fontSize = '1.5em';
 			emojiSpan.style.marginRight = '10px';
 			emojiSpan.textContent = emoji;
 
-			// Add keyword
 			const keywordSpan = document.createElement('span');
 			keywordSpan.addClass('emoji-suggestion-keyword');
 			keywordSpan.style.opacity = '0.7';
@@ -227,23 +224,20 @@ class EmojiSuggester extends EditorSuggest<string> {
 
 			container.appendChild(emojiSpan);
 			container.appendChild(keywordSpan);
-
 			el.appendChild(container);
 		} else {
 			el.setText(value);
 		}
 	}
 
-	selectSuggestion(value: string, evt: MouseEvent | KeyboardEvent): void {
+	selectSuggestion(value: string): void {
 		const { start, end } = this.context!;
-
-		// Extract just the emoji from the value (remove the keyword part)
 		const emoji = value.split(' ')[0];
-
 		this.context!.editor.replaceRange(emoji, start, end);
 	}
 }
 
+// --- Plugin Setting Tab ---
 class EmojiSuggesterSettingTab extends PluginSettingTab {
 	plugin: EmojiSuggesterPlugin;
 
@@ -255,7 +249,6 @@ class EmojiSuggesterSettingTab extends PluginSettingTab {
 	display(): void {
 		const { containerEl } = this;
 		containerEl.empty();
-
 		containerEl.createEl('h2', { text: 'Emoji Suggester Settings' });
 
 		new Setting(containerEl)
