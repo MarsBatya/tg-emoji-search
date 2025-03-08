@@ -27,12 +27,15 @@ interface InitOutput {
 interface EmojiSuggesterPluginSettings {
 	defaultLanguage: string;
 	triggerChar: string;
+	showKeywords: boolean; // new option
 }
 
 const DEFAULT_SETTINGS: EmojiSuggesterPluginSettings = {
 	defaultLanguage: 'english',
-	triggerChar: ':'
+	triggerChar: ':',
+	showKeywords: true, // default to showing keywords
 };
+
 
 const RANDOM_EMOJIS = ['😀', '😂', '🥰', '😎', '🤔', '👍', '🎉', '✨', '🔥', '❤️'];
 
@@ -166,7 +169,6 @@ class EmojiSuggester extends EditorSuggest<string> {
 		const triggerRegex = new RegExp(`${escapedTrigger}([a-zA-Zа-яА-Я ]*)$`);
 		const match = subString.match(triggerRegex);
 		if (!match) return null;
-
 		return {
 			start: { line: cursor.line, ch: subString.lastIndexOf(this.settings.triggerChar) },
 			end: cursor,
@@ -176,17 +178,13 @@ class EmojiSuggester extends EditorSuggest<string> {
 
 	getSuggestions(context: EditorSuggestContext): string[] {
 		if (!context.query || !this.emojiSearch) return [];
-
-		// Determine language based on query content
 		const language = /[а-яА-Я]/.test(context.query)
 			? 'russian'
 			: this.settings.defaultLanguage;
 
 		try {
-			const results: EmojiSearchResult = JSON.parse(this.emojiSearch.search(context.query, language));
+			const results: [string, string[]][] = JSON.parse(this.emojiSearch.search(context.query, language));
 			const emojiMap = new Map<string, string>();
-
-			// Build a map with the first keyword for each unique emoji
 			for (const [keyword, emojis] of results) {
 				for (const emoji of emojis) {
 					if (!emojiMap.has(emoji)) {
@@ -195,9 +193,13 @@ class EmojiSuggester extends EditorSuggest<string> {
 				}
 			}
 
-			return Array.from(emojiMap.entries()).map(
-				([emoji, keyword]) => `${emoji} (${keyword})`
-			);
+			if (this.settings.showKeywords) {
+				return Array.from(emojiMap.entries()).map(
+					([emoji, keyword]) => `${emoji} (${keyword})`
+				);
+			} else {
+				return Array.from(emojiMap.keys());
+			}
 		} catch (error) {
 			console.error('Error in emoji search:', error);
 			return [];
@@ -205,36 +207,50 @@ class EmojiSuggester extends EditorSuggest<string> {
 	}
 
 	renderSuggestion(value: string, el: HTMLElement): void {
-		const matches = value.match(/^(.*) \((.*)\)$/);
-		if (matches) {
-			const [, emoji, keyword] = matches;
-			const container = document.createElement('div');
-			container.addClass('emoji-suggestion-item');
+		el.empty(); // Clear previous content
+		if (this.settings.showKeywords) {
+			// Render emoji with keyword (vertical list)
+			const matches = value.match(/^(.*) \((.*)\)$/);
+			if (matches) {
+				const [, emoji, keyword] = matches;
+				const container = document.createElement('div');
+				container.addClass('emoji-suggestion-item');
 
+				const emojiSpan = document.createElement('span');
+				emojiSpan.addClass('emoji-suggestion-emoji');
+				emojiSpan.style.fontSize = '1.5em';
+				emojiSpan.style.marginRight = '10px';
+				emojiSpan.textContent = emoji;
+
+				const keywordSpan = document.createElement('span');
+				keywordSpan.addClass('emoji-suggestion-keyword');
+				keywordSpan.style.opacity = '0.7';
+				keywordSpan.textContent = keyword;
+
+				container.appendChild(emojiSpan);
+				container.appendChild(keywordSpan);
+				el.appendChild(container);
+			} else {
+				el.setText(value);
+			}
+		} else {
+			// Render only the emoji (horizontal layout)
 			const emojiSpan = document.createElement('span');
 			emojiSpan.addClass('emoji-suggestion-emoji');
 			emojiSpan.style.fontSize = '1.5em';
-			emojiSpan.style.marginRight = '10px';
-			emojiSpan.textContent = emoji;
-
-			const keywordSpan = document.createElement('span');
-			keywordSpan.addClass('emoji-suggestion-keyword');
-			keywordSpan.style.opacity = '0.7';
-			keywordSpan.textContent = keyword;
-
-			container.appendChild(emojiSpan);
-			container.appendChild(keywordSpan);
-			el.appendChild(container);
-		} else {
-			el.setText(value);
+			emojiSpan.style.margin = '0 10px';
+			emojiSpan.textContent = value;
+			el.appendChild(emojiSpan);
 		}
 	}
 
-	selectSuggestion(value: string): void {
+	selectSuggestion(value: string, evt: MouseEvent | KeyboardEvent): void {
+		// When only emojis are shown, the value is the emoji itself.
+		const emoji = this.settings.showKeywords ? value.split(' ')[0] : value;
 		const { start, end } = this.context!;
-		const emoji = value.split(' ')[0];
 		this.context!.editor.replaceRange(emoji, start, end);
 	}
+
 }
 
 // --- Plugin Setting Tab ---
@@ -275,5 +291,15 @@ class EmojiSuggesterSettingTab extends PluginSettingTab {
 						await this.plugin.saveSettings();
 					}
 				}));
+		new Setting(containerEl)
+			.setName('Show keywords in suggestions')
+			.setDesc('Toggle whether to display the keyword alongside the emoji')
+			.addToggle(toggle => toggle
+				.setValue(this.plugin.settings.showKeywords)
+				.onChange(async (value) => {
+					this.plugin.settings.showKeywords = value;
+					await this.plugin.saveSettings();
+				}));
+
 	}
 }
