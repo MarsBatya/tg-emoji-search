@@ -1,0 +1,18 @@
+{
+  "name": "emoji-search",
+  "type": "module",
+  "version": "0.1.0",
+  "files": [
+    "emoji_search_bg.wasm",
+    "emoji_search.js",
+    "emoji_search.d.ts"
+  ],
+  "main": "emoji_search.js",
+  "types": "emoji_search.d.ts",
+  "sideEffects": [
+    "./snippets/*"
+  ],
+  "devDependencies": {
+    "esbuild-plugin-copy": "^2.1.1"
+  }
+}

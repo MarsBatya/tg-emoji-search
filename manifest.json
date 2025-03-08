@@ -1,0 +1,11 @@
+{
+	"id": "tg-emoji-search",
+	"name": "TG Emoji Search ",
+	"version": "1.0.0",
+	"minAppVersion": "0.15.0",
+	"description": "Lets you type out emojis like in Telegram.",
+	"author": "Mars",
+	"authorUrl": "https://obsidian.md",
+	"fundingUrl": "https://obsidian.md/pricing",
+	"isDesktopOnly": false
+}
