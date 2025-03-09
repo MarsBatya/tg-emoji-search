@@ -11,10 +11,13 @@ import {
 	PluginSettingTab,
 	Setting
 } from 'obsidian';
+
 import init, { EmojiSearch } from './pkg/emoji_search_fixed.js';
+import emojiDataEnglish from "./emoji_data_english.json";
+import emojiDataRussian from "./emoji_data_russian.json";
+import wasmDataUrl from "./pkg/emoji_search_bg.wasm";
 
 // --- Type Definitions ---
-type EmojiSearchResult = [string, string[]][];
 
 interface EmojiSearchWasm {
 	new(): EmojiSearch;
@@ -42,8 +45,13 @@ const DEFAULT_SETTINGS: EmojiSuggesterPluginSettings = {
 const RANDOM_EMOJIS = ['😀', '😂', '🥰', '😎', '🤔', '👍', '🎉', '✨', '🔥', '❤️'];
 
 // --- Helper Functions ---
-function getResourceUrl(app: App, relativePath: string): string {
-	return app.vault.adapter.getResourcePath(relativePath);
+// function getResourceUrl(app: App, relativePath: string): string {
+// 	return app.vault.adapter.getResourcePath(relativePath);
+// }
+
+async function loadEmojiData() {
+	// The JSON is already inlined as objects
+	return { english: emojiDataEnglish, russian: emojiDataRussian };
 }
 
 // --- Main Plugin Class ---
@@ -60,7 +68,7 @@ export default class EmojiSuggesterPlugin extends Plugin {
 
 			// Create instance of EmojiSearch and initialize with emoji data
 			this.emojiSearch = new EmojiSearch();
-			const emojiData = await this.loadEmojiData();
+			const emojiData = await loadEmojiData();
 			this.emojiSearch.initialize(JSON.stringify(emojiData));
 			console.log('WASM initialized successfully with emoji data');
 			// Register editor suggestions using our custom suggester
@@ -96,12 +104,12 @@ export default class EmojiSuggesterPlugin extends Plugin {
 	async loadWasmModule(): Promise<InitOutput> {
 		try {
 			const wasmModule = await import('./pkg/emoji_search_fixed.js');
-			const wasmUrl = getResourceUrl(this.app, `${this.manifest.dir}/pkg/emoji_search_bg.wasm`);
+			// const wasmUrl = this.app.vault.adapter.getResourcePath(`${this.manifest.dir}/pkg/emoji_search_bg.wasm`);
 
 			// Fetch the WASM binary
-			const wasmResponse = await fetch(wasmUrl);
+			const wasmResponse = await fetch(wasmDataUrl as unknown as string);;
 			if (!wasmResponse.ok) {
-				throw new Error(`Failed to fetch WASM from ${wasmUrl}: ${wasmResponse.statusText}`);
+				throw new Error(`Failed to fetch WASM from ${wasmDataUrl}: ${wasmResponse.statusText}`);
 			}
 			const wasmBytes = await wasmResponse.arrayBuffer();
 
@@ -109,32 +117,6 @@ export default class EmojiSuggesterPlugin extends Plugin {
 			return await wasmModule.default(wasmBytes);
 		} catch (error) {
 			console.error('Error loading WASM module:', error);
-			throw error;
-		}
-	}
-
-	async loadEmojiData(): Promise<{ english: Record<string, string>; russian: Record<string, string> }> {
-		try {
-			const englishUrl = getResourceUrl(this.app, `${this.manifest.dir}/emoji_data_english.json`);
-			const russianUrl = getResourceUrl(this.app, `${this.manifest.dir}/emoji_data_russian.json`);
-
-			const [englishResponse, russianResponse] = await Promise.all([
-				fetch(englishUrl),
-				fetch(russianUrl)
-			]);
-
-			if (!englishResponse.ok || !russianResponse.ok) {
-				throw new Error('Failed to load one or more emoji data files');
-			}
-
-			const [englishData, russianData] = await Promise.all([
-				englishResponse.json(),
-				russianResponse.json()
-			]);
-
-			return { english: englishData, russian: russianData };
-		} catch (error) {
-			console.error('Error loading emoji data:', error);
 			throw error;
 		}
 	}

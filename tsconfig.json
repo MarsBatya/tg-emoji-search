@@ -11,6 +11,9 @@
     "importHelpers": true,
     "isolatedModules": true,
     "strictNullChecks": true,
+    "resolveJsonModule": true,
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
     "lib": [
       "DOM",
       "ES5",
