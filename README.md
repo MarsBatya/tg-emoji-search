@@ -1,4 +1,4 @@
-# Obsidian Emoji Search Plugin
+# Obsidian "TG Emoji Search" Plugin
 
 ![demo](https://github.com/user-attachments/assets/22517d21-6493-430e-bd03-3b2cc6f41f1e)
 
@@ -63,4 +63,4 @@ This project is distributed under the [0BSD License](LICENSE).
 
 ---
 
-Enjoy faster and friendlier emoji insertion in your Obsidian notes with the Obsidian Emoji Search Plugin!
+Enjoy faster and friendlier emoji insertion in your Obsidian notes with the Obsidian "TG Emoji Search" Plugin!
