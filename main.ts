@@ -27,13 +27,15 @@ interface InitOutput {
 interface EmojiSuggesterPluginSettings {
 	defaultLanguage: string;
 	triggerChar: string;
-	showKeywords: boolean; // new option
+	showKeywords: boolean;
+	emojiPopularity: Record<string, number>;
 }
 
 const DEFAULT_SETTINGS: EmojiSuggesterPluginSettings = {
 	defaultLanguage: 'english',
 	triggerChar: ':',
 	showKeywords: true, // default to showing keywords
+	emojiPopularity: {}, // empty ranking
 };
 
 
@@ -62,7 +64,7 @@ export default class EmojiSuggesterPlugin extends Plugin {
 			this.emojiSearch.initialize(JSON.stringify(emojiData));
 			console.log('WASM initialized successfully with emoji data');
 			// Register editor suggestions using our custom suggester
-			this.registerEditorSuggest(new EmojiSuggester(this.app, this.emojiSearch, this.settings));
+			this.registerEditorSuggest(new EmojiSuggester(this.app, this, this.emojiSearch));
 
 			// Uncomment if you want a success notice:
 			// new Notice('Emoji Suggester plugin loaded successfully');
@@ -155,11 +157,13 @@ export default class EmojiSuggesterPlugin extends Plugin {
 class EmojiSuggester extends EditorSuggest<string> {
 	private emojiSearch: EmojiSearch;
 	private settings: EmojiSuggesterPluginSettings;
+	private plugin: EmojiSuggesterPlugin;
 
-	constructor(app: App, emojiSearch: EmojiSearch, settings: EmojiSuggesterPluginSettings) {
+	constructor(app: App, plugin: EmojiSuggesterPlugin, emojiSearch: EmojiSearch) {
 		super(app);
+		this.plugin = plugin;
 		this.emojiSearch = emojiSearch;
-		this.settings = settings;
+		this.settings = plugin.settings;
 	}
 
 	onTrigger(cursor: EditorPosition, editor: Editor): EditorSuggestTriggerInfo | null {
@@ -193,12 +197,22 @@ class EmojiSuggester extends EditorSuggest<string> {
 				}
 			}
 
+			// Convert to array for sorting
+			const emojisWithKeywords = Array.from(emojiMap.entries());
+
+			// Sort by popularity (from most to least used)
+			emojisWithKeywords.sort((a, b) => {
+				const popA = this.plugin.settings.emojiPopularity[a[0]] || 0;
+				const popB = this.plugin.settings.emojiPopularity[b[0]] || 0;
+				return popB - popA; // Sort in descending order
+			});
+
 			if (this.settings.showKeywords) {
-				return Array.from(emojiMap.entries()).map(
+				return emojisWithKeywords.map(
 					([emoji, keyword]) => `${emoji} (${keyword})`
 				);
 			} else {
-				return Array.from(emojiMap.keys());
+				return emojisWithKeywords.map(([emoji, _]) => emoji);
 			}
 		} catch (error) {
 			console.error('Error in emoji search:', error);
@@ -249,8 +263,25 @@ class EmojiSuggester extends EditorSuggest<string> {
 		const emoji = this.settings.showKeywords ? value.split(' ')[0] : value;
 		const { start, end } = this.context!;
 		this.context!.editor.replaceRange(emoji, start, end);
+
+		this.updateEmojiPopularity(emoji);
 	}
 
+	private updateEmojiPopularity(emoji: string): void {
+		// Get current settings from the plugin
+		const settings = this.plugin.settings;
+
+		// Initialize count if this is the first time using this emoji
+		if (!settings.emojiPopularity[emoji]) {
+			settings.emojiPopularity[emoji] = 0;
+		}
+
+		// Increment usage count
+		settings.emojiPopularity[emoji]++;
+
+		// Save settings
+		this.plugin.saveSettings();
+	}
 }
 
 // --- Plugin Setting Tab ---
@@ -300,6 +331,71 @@ class EmojiSuggesterSettingTab extends PluginSettingTab {
 					this.plugin.settings.showKeywords = value;
 					await this.plugin.saveSettings();
 				}));
+		new Setting(containerEl)
+			.setName('Reset Emoji Popularity')
+			.setDesc('Reset your emoji usage statistics')
+			.addButton(button => button
+				.setButtonText('Reset')
+				.onClick(async () => {
+					this.plugin.settings.emojiPopularity = {};
+					await this.plugin.saveSettings();
+					new Notice('Emoji popularity statistics have been reset');
 
+					// Reset the rendered top 10 list
+					const topEmojisEl = containerEl.querySelector('.emoji-popularity-stats');
+					if (topEmojisEl) {
+						topEmojisEl.removeChild(topEmojisEl.querySelector('.emoji-top-list')!);
+						topEmojisEl.createEl('p', { text: 'No emojis used yet' });
+					}
+				}));
+
+		// Display top 10 most used emojis
+		const topEmojisEl = containerEl.createDiv();
+		topEmojisEl.addClass('emoji-popularity-stats');
+		topEmojisEl.createEl('h3', { text: 'Your Most Used Emojis' });
+
+		const popularityEntries = Object.entries(this.plugin.settings.emojiPopularity);
+		popularityEntries.sort((a, b) => b[1] - a[1]);
+
+		if (popularityEntries.length === 0) {
+			topEmojisEl.createEl('p', { text: 'No emojis used yet' });
+		} else {
+			const topList = topEmojisEl.createEl('div');
+			topList.addClass('emoji-top-list');
+
+			// Take top 10 or less
+			const topEmojis = popularityEntries.slice(0, 10);
+			for (const [emoji, count] of topEmojis) {
+				const item = topList.createEl('div');
+				item.addClass('emoji-top-item');
+
+				const emojiSpan = item.createEl('span');
+				emojiSpan.addClass('emoji-top-symbol');
+				emojiSpan.style.fontSize = '1.5em';
+				emojiSpan.style.marginRight = '10px';
+				emojiSpan.textContent = emoji;
+
+				const countSpan = item.createEl('span');
+				countSpan.addClass('emoji-top-count');
+				countSpan.textContent = `Used ${count} time${count !== 1 ? 's' : ''}`;
+			}
+		}
+
+		topEmojisEl.createEl('style', {
+			text: `
+			.emoji-top-list {
+				margin-top: 10px;
+			}
+			.emoji-top-item {
+				display: flex;
+				align-items: center;
+				padding: 5px 0;
+			}
+			.emoji-top-symbol {
+				min-width: 40px;
+				text-align: center;
+			}
+			`
+		});
 	}
 }
