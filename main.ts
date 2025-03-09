@@ -66,7 +66,7 @@ export default class EmojiSuggesterPlugin extends Plugin {
 			// Register editor suggestions using our custom suggester
 			this.registerEditorSuggest(new EmojiSuggester(this.app, this, this.emojiSearch));
 
-			// Uncomment if you want a success notice:
+			// Uncomment if to have a success notice:
 			// new Notice('Emoji Suggester plugin loaded successfully');
 		} catch (error) {
 			console.error('Failed to initialize WASM:', error);
@@ -140,11 +140,13 @@ export default class EmojiSuggesterPlugin extends Plugin {
 	}
 
 	onunload() {
-		// Cleanup logic if necessary (e.g., freeing WASM resources)
+		// freeing WASM resources
+		if (this.emojiSearch) {
+			this.emojiSearch.free();
+		}
 	}
 
 	async loadSettings() {
-		// Using spread operator for clarity
 		this.settings = { ...DEFAULT_SETTINGS, ...(await this.loadData() || {}) };
 	}
 
@@ -248,7 +250,7 @@ class EmojiSuggester extends EditorSuggest<string> {
 				el.setText(value);
 			}
 		} else {
-			// Render only the emoji (horizontal layout)
+			// Render only the emoji
 			const emojiSpan = document.createElement('span');
 			emojiSpan.addClass('emoji-suggestion-emoji');
 			emojiSpan.style.fontSize = '1.5em';
