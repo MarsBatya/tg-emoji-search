@@ -32,13 +32,15 @@ interface EmojiSuggesterPluginSettings {
 	triggerChar: string;
 	showKeywords: boolean;
 	emojiPopularity: Record<string, number>;
+	customEmojiMappings: Record<string, string>;
 }
 
 const DEFAULT_SETTINGS: EmojiSuggesterPluginSettings = {
 	defaultLanguage: 'english',
 	triggerChar: ':',
-	showKeywords: true, // default to showing keywords
-	emojiPopularity: {}, // empty ranking
+	showKeywords: true,
+	emojiPopularity: {},
+	customEmojiMappings: {},
 };
 
 
@@ -154,7 +156,6 @@ class EmojiSuggester extends EditorSuggest<string> {
 			query: match[1]?.trim() || ''
 		};
 	}
-
 	getSuggestions(context: EditorSuggestContext): string[] {
 		if (!context.query || !this.emojiSearch) return [];
 		const language = /[а-яА-Я]/.test(context.query)
@@ -162,8 +163,11 @@ class EmojiSuggester extends EditorSuggest<string> {
 			: this.settings.defaultLanguage;
 
 		try {
+			// Get results from the WASM module
 			const results: [string, string[]][] = JSON.parse(this.emojiSearch.search(context.query, language));
 			const emojiMap = new Map<string, string>();
+
+			// Add emojis from WASM search results
 			for (const [keyword, emojis] of results) {
 				for (const emoji of emojis) {
 					if (!emojiMap.has(emoji)) {
@@ -172,12 +176,21 @@ class EmojiSuggester extends EditorSuggest<string> {
 				}
 			}
 
+			// Add custom emoji mappings that match the query
+			const query = context.query.toLowerCase();
+			for (const [keyword, emoji] of Object.entries(this.plugin.settings.customEmojiMappings)) {
+				if (keyword.toLowerCase().includes(query)) {
+					emojiMap.set(emoji, keyword);
+				}
+			}
+
 			const emojisWithKeywords = Array.from(emojiMap.entries());
 
+			// Sort by popularity
 			emojisWithKeywords.sort((a, b) => {
 				const popA = this.plugin.settings.emojiPopularity[a[0]] || 0;
 				const popB = this.plugin.settings.emojiPopularity[b[0]] || 0;
-				return popB - popA; // Sort in descending order
+				return popB - popA;
 			});
 
 			if (this.settings.showKeywords) {
@@ -192,7 +205,6 @@ class EmojiSuggester extends EditorSuggest<string> {
 			return [];
 		}
 	}
-
 	renderSuggestion(value: string, el: HTMLElement): void {
 		el.empty();
 		if (this.settings.showKeywords) {
@@ -257,7 +269,7 @@ class EmojiSuggesterSettingTab extends PluginSettingTab {
 	display(): void {
 		const { containerEl } = this;
 		containerEl.empty();
-		containerEl.createEl('h2', { text: 'Emoji Suggester Settings' });
+		containerEl.createEl('h2', { text: 'Advanced' });
 
 		new Setting(containerEl)
 			.setName('Default Language')
@@ -292,6 +304,64 @@ class EmojiSuggesterSettingTab extends PluginSettingTab {
 					this.plugin.settings.showKeywords = value;
 					await this.plugin.saveSettings();
 				}));
+
+		// Add section for custom emoji mappings
+		containerEl.createEl('h2', { text: 'Custom Emoji Mappings' });
+
+		// Display existing custom mappings
+		const customMappingsContainer = containerEl.createDiv('custom-emoji-mappings-container');
+		this.renderCustomMappings(customMappingsContainer);
+
+		// Add new mapping controls
+		const newMappingContainer = containerEl.createDiv('new-emoji-mapping-container');
+
+		const keywordInput = newMappingContainer.createEl('input');
+		keywordInput.type = 'text';
+		keywordInput.placeholder = 'Keyword';
+		keywordInput.classList.add('custom-emoji-keyword-input');
+
+		const emojiInput = newMappingContainer.createEl('input');
+		emojiInput.type = 'text';
+		emojiInput.placeholder = 'Emoji';
+		emojiInput.classList.add('custom-emoji-input');
+
+		const addButton = newMappingContainer.createEl('button');
+		addButton.setText('Add');
+		addButton.classList.add('custom-emoji-add-button');
+		addButton.addEventListener('click', async () => {
+			const keyword = keywordInput.value.trim();
+			const emoji = emojiInput.value.trim();
+
+			if (keyword && emoji) {
+				this.plugin.settings.customEmojiMappings[keyword] = emoji;
+				await this.plugin.saveSettings();
+
+				// Clear inputs
+				keywordInput.value = '';
+				emojiInput.value = '';
+
+				// Refresh the mappings display
+				this.renderCustomMappings(customMappingsContainer);
+				new Notice(`Added custom mapping: ${keyword} → ${emoji}`);
+			} else {
+				new Notice('Both keyword and emoji are required');
+			}
+		});
+
+		// Reset Custom Mappings button
+		new Setting(containerEl)
+			.setName('Reset Custom Emoji Mappings')
+			.setDesc('Remove all your custom emoji mappings')
+			.addButton(button => button
+				.setButtonText('Reset')
+				.onClick(async () => {
+					this.plugin.settings.customEmojiMappings = {};
+					await this.plugin.saveSettings();
+					this.renderCustomMappings(customMappingsContainer);
+					new Notice('Custom emoji mappings have been reset');
+				}));
+
+
 		new Setting(containerEl)
 			.setName('Reset Emoji Popularity')
 			.setDesc('Reset your emoji usage statistics')
@@ -313,7 +383,7 @@ class EmojiSuggesterSettingTab extends PluginSettingTab {
 		// Display top 10 most used emojis
 		const topEmojisEl = containerEl.createDiv();
 		topEmojisEl.addClass('emoji-popularity-stats');
-		topEmojisEl.createEl('h3', { text: 'Your Most Used Emojis' });
+		topEmojisEl.createEl('h2', { text: 'Your Most Used Emojis' });
 
 		const popularityEntries = Object.entries(this.plugin.settings.emojiPopularity);
 		popularityEntries.sort((a, b) => b[1] - a[1]);
@@ -338,6 +408,47 @@ class EmojiSuggesterSettingTab extends PluginSettingTab {
 				countSpan.addClass('emoji-top-count');
 				countSpan.textContent = `Used ${count} time${count !== 1 ? 's' : ''}`;
 			}
+
+		
+		}
+	
+	}
+	private renderCustomMappings(containerEl: HTMLElement): void {
+		containerEl.empty();
+
+		const mappings = this.plugin.settings.customEmojiMappings;
+		const entries = Object.entries(mappings);
+
+		if (entries.length === 0) {
+			containerEl.createEl('p', { text: 'No custom emoji mappings yet' });
+			return;
+		}
+
+		const table = containerEl.createEl('table');
+		table.classList.add('custom-emoji-table');
+
+		// Create header row
+		const headerRow = table.createEl('tr');
+		headerRow.createEl('th', { text: 'Keyword' });
+		headerRow.createEl('th', { text: 'Emoji' });
+		headerRow.createEl('th', { text: 'Action' });
+
+		// Create rows for each mapping
+		for (const [keyword, emoji] of entries) {
+			const row = table.createEl('tr');
+			row.createEl('td', { text: keyword });
+			row.createEl('td', { text: emoji });
+
+			const actionCell = row.createEl('td');
+			const deleteButton = actionCell.createEl('button');
+			deleteButton.setText('Delete');
+			deleteButton.classList.add('custom-emoji-delete-button');
+			deleteButton.addEventListener('click', async () => {
+				delete this.plugin.settings.customEmojiMappings[keyword];
+				await this.plugin.saveSettings();
+				this.renderCustomMappings(containerEl);
+				new Notice(`Removed custom mapping: ${keyword}`);
+			});
 		}
 	}
 }

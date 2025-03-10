@@ -20,7 +20,11 @@ This plugin provides a fast and intuitive way to insert emojis into your Obsidia
    - The core emoji search is implemented in Rust, compiled to WebAssembly for speed.
    - TypeScript provides type safety and works seamlessly with the Obsidian plugin API.
 
-4. **Customizable Settings**  
+4. **Custom emoji mappings**
+   - Feel free to add or delete your own keyword, when you're not satisfied with existing ones
+   - You can also reset these mappings easily
+
+5. **Customizable Settings**  
    - **Default Language**: Choose which language’s keywords to use.
    - **Trigger Character**: Change the character that initiates the emoji search (default is `:`).
    - **Show Keywords in Suggestions**: Toggle the display of each emoji’s keyword in the suggestion list.

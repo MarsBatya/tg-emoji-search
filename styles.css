@@ -1,43 +1,116 @@
 /* Emoji Suggester Plugin Styles */
 
-/* Suggestion items styling */
+/* Common variables */
+:root {
+    --emoji-font-size: 1.5em;
+    --emoji-margin-right: 0.625rem;
+    --standard-spacing: 0.625rem;
+    --container-margin: 1rem;
+    --border-color: var(--background-modifier-border);
+}
+
+/* === Suggestion Popup Styles === */
 .emoji-suggestion-item {
     display: flex;
     align-items: center;
+    padding: 0.25rem 0;
 }
 
 .emoji-suggestion-emoji {
-    font-size: 1.5em;
-    margin-right: 10px;
+    font-size: var(--emoji-font-size);
+    margin-right: var(--emoji-margin-right);
+}
+
+.emoji-suggestion-emoji:only-child {
+    margin: 0 var(--standard-spacing);
 }
 
 .emoji-suggestion-keyword {
     opacity: 0.7;
 }
 
-/* Settings tab styling */
+/* === Settings Tab Styles === */
+
+
+/* Custom Emoji Mappings Section */
+.custom-emoji-mappings-container {
+    margin-bottom: var(--container-margin);
+    max-height: 12.5rem;
+    overflow-y: auto;
+    border: 1px solid var(--border-color);
+    border-radius: 0.25rem;
+}
+
+.custom-emoji-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.custom-emoji-table th,
+.custom-emoji-table td {
+    padding: 0.5rem;
+    text-align: left;
+    border-bottom: 1px solid var(--border-color);
+}
+
+/* New Emoji Mapping Controls */
+.new-emoji-mapping-container {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: var(--container-margin);
+    align-items: center;
+}
+
+.custom-emoji-keyword-input,
+.custom-emoji-input {
+    flex: 1;
+    padding: 0.5rem;
+    border: 1px solid var(--border-color);
+    border-radius: 0.25rem;
+}
+
+.custom-emoji-add-button,
+.custom-emoji-delete-button {
+    padding: 0.4rem 0.6rem;
+    cursor: pointer;
+    background-color: var(--interactive-accent);
+    color: var(--text-on-accent);
+    border: none;
+    border-radius: 0.25rem;
+    transition: background-color 0.2s ease;
+}
+
+.custom-emoji-add-button:hover,
+.custom-emoji-delete-button:hover {
+    background-color: var(--interactive-accent-hover);
+}
+
+.custom-emoji-delete-button {
+    background-color: var(--text-error);
+}
+
+.custom-emoji-delete-button:hover {
+    background-color: var(--text-error-hover);
+}
+
+/* Emoji Popularity Section */
 .emoji-popularity-stats {
-    margin-top: 20px;
+    margin-top: var(--container-margin);
 }
 
 .emoji-top-list {
-    margin-top: 10px;
+    margin-top: var(--standard-spacing);
 }
 
 .emoji-top-item {
     display: flex;
     align-items: center;
-    padding: 5px 0;
+    padding: 0.3125rem 0;
 }
 
 .emoji-top-symbol {
-    font-size: 1.5em;
-    margin-right: 10px;
-    min-width: 40px;
+    font-size: var(--emoji-font-size);
+    margin-right: var(--emoji-margin-right);
+    min-width: 2.5rem;
     text-align: center;
-}
-
-/* When showing only emoji without keywords */
-.emoji-suggestion-emoji:only-child {
-    margin: 0 10px;
 }
