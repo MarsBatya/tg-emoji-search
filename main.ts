@@ -44,11 +44,6 @@ const DEFAULT_SETTINGS: EmojiSuggesterPluginSettings = {
 
 const RANDOM_EMOJIS = ['😀', '😂', '🥰', '😎', '🤔', '👍', '🎉', '✨', '🔥', '❤️'];
 
-// --- Helper Functions ---
-// function getResourceUrl(app: App, relativePath: string): string {
-// 	return app.vault.adapter.getResourcePath(relativePath);
-// }
-
 async function loadEmojiData() {
 	// The JSON is already inlined as objects
 	return { english: emojiDataEnglish, russian: emojiDataRussian };
@@ -74,7 +69,7 @@ export default class EmojiSuggesterPlugin extends Plugin {
 			// Register editor suggestions using our custom suggester
 			this.registerEditorSuggest(new EmojiSuggester(this.app, this, this.emojiSearch));
 
-			// Uncomment if to have a success notice:
+			// Uncomment to have a success notice:
 			// new Notice('Emoji Suggester plugin loaded successfully');
 		} catch (error) {
 			console.error('Failed to initialize WASM:', error);
@@ -104,16 +99,13 @@ export default class EmojiSuggesterPlugin extends Plugin {
 	async loadWasmModule(): Promise<InitOutput> {
 		try {
 			const wasmModule = await import('./pkg/emoji_search_fixed.js');
-			// const wasmUrl = this.app.vault.adapter.getResourcePath(`${this.manifest.dir}/pkg/emoji_search_bg.wasm`);
 
-			// Fetch the WASM binary
 			const wasmResponse = await fetch(wasmDataUrl as unknown as string);;
 			if (!wasmResponse.ok) {
 				throw new Error(`Failed to fetch WASM from ${wasmDataUrl}: ${wasmResponse.statusText}`);
 			}
 			const wasmBytes = await wasmResponse.arrayBuffer();
 
-			// Initialize the module (using the binary data)
 			return await wasmModule.default(wasmBytes);
 		} catch (error) {
 			console.error('Error loading WASM module:', error);
@@ -137,7 +129,6 @@ export default class EmojiSuggesterPlugin extends Plugin {
 	}
 }
 
-// --- Editor Suggestion Class ---
 class EmojiSuggester extends EditorSuggest<string> {
 	private emojiSearch: EmojiSearch;
 	private settings: EmojiSuggesterPluginSettings;
@@ -181,10 +172,8 @@ class EmojiSuggester extends EditorSuggest<string> {
 				}
 			}
 
-			// Convert to array for sorting
 			const emojisWithKeywords = Array.from(emojiMap.entries());
 
-			// Sort by popularity (from most to least used)
 			emojisWithKeywords.sort((a, b) => {
 				const popA = this.plugin.settings.emojiPopularity[a[0]] || 0;
 				const popB = this.plugin.settings.emojiPopularity[b[0]] || 0;
@@ -205,7 +194,7 @@ class EmojiSuggester extends EditorSuggest<string> {
 	}
 
 	renderSuggestion(value: string, el: HTMLElement): void {
-		el.empty(); // Clear previous content
+		el.empty();
 		if (this.settings.showKeywords) {
 			// Render emoji with keyword (vertical list)
 			const matches = value.match(/^(.*) \((.*)\)$/);
@@ -252,23 +241,16 @@ class EmojiSuggester extends EditorSuggest<string> {
 	}
 
 	private updateEmojiPopularity(emoji: string): void {
-		// Get current settings from the plugin
 		const settings = this.plugin.settings;
 
-		// Initialize count if this is the first time using this emoji
 		if (!settings.emojiPopularity[emoji]) {
 			settings.emojiPopularity[emoji] = 0;
 		}
-
-		// Increment usage count
 		settings.emojiPopularity[emoji]++;
-
-		// Save settings
 		this.plugin.saveSettings();
 	}
 }
 
-// --- Plugin Setting Tab ---
 class EmojiSuggesterSettingTab extends PluginSettingTab {
 	plugin: EmojiSuggesterPlugin;
 
