@@ -1,7 +1,7 @@
 {
 	"id": "tg-emoji-search",
 	"name": "TG Emoji Search",
-	"version": "1.0.1",
+	"version": "1.1.0",
 	"minAppVersion": "0.15.0",
 	"description": "Lets you type out emojis like in Telegram.",
 	"author": "MarsBatya",
