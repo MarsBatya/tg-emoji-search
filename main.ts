@@ -205,13 +205,10 @@ class EmojiSuggester extends EditorSuggest<string> {
 
 				const emojiSpan = document.createElement('span');
 				emojiSpan.addClass('emoji-suggestion-emoji');
-				emojiSpan.style.fontSize = '1.5em';
-				emojiSpan.style.marginRight = '10px';
 				emojiSpan.textContent = emoji;
 
 				const keywordSpan = document.createElement('span');
 				keywordSpan.addClass('emoji-suggestion-keyword');
-				keywordSpan.style.opacity = '0.7';
 				keywordSpan.textContent = keyword;
 
 				container.appendChild(emojiSpan);
@@ -224,8 +221,6 @@ class EmojiSuggester extends EditorSuggest<string> {
 			// Render only the emoji
 			const emojiSpan = document.createElement('span');
 			emojiSpan.addClass('emoji-suggestion-emoji');
-			emojiSpan.style.fontSize = '1.5em';
-			emojiSpan.style.margin = '0 10px';
 			emojiSpan.textContent = value;
 			el.appendChild(emojiSpan);
 		}
@@ -337,8 +332,6 @@ class EmojiSuggesterSettingTab extends PluginSettingTab {
 
 				const emojiSpan = item.createEl('span');
 				emojiSpan.addClass('emoji-top-symbol');
-				emojiSpan.style.fontSize = '1.5em';
-				emojiSpan.style.marginRight = '10px';
 				emojiSpan.textContent = emoji;
 
 				const countSpan = item.createEl('span');
@@ -346,22 +339,5 @@ class EmojiSuggesterSettingTab extends PluginSettingTab {
 				countSpan.textContent = `Used ${count} time${count !== 1 ? 's' : ''}`;
 			}
 		}
-
-		topEmojisEl.createEl('style', {
-			text: `
-			.emoji-top-list {
-				margin-top: 10px;
-			}
-			.emoji-top-item {
-				display: flex;
-				align-items: center;
-				padding: 5px 0;
-			}
-			.emoji-top-symbol {
-				min-width: 40px;
-				text-align: center;
-			}
-			`
-		});
 	}
 }

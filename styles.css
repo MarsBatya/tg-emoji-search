@@ -1,8 +1,43 @@
-/*
+/* Emoji Suggester Plugin Styles */
 
-This CSS file will be included with your plugin, and
-available in the app when your plugin is enabled.
+/* Suggestion items styling */
+.emoji-suggestion-item {
+    display: flex;
+    align-items: center;
+}
 
-If your plugin does not need CSS, delete this file.
+.emoji-suggestion-emoji {
+    font-size: 1.5em;
+    margin-right: 10px;
+}
 
-*/
+.emoji-suggestion-keyword {
+    opacity: 0.7;
+}
+
+/* Settings tab styling */
+.emoji-popularity-stats {
+    margin-top: 20px;
+}
+
+.emoji-top-list {
+    margin-top: 10px;
+}
+
+.emoji-top-item {
+    display: flex;
+    align-items: center;
+    padding: 5px 0;
+}
+
+.emoji-top-symbol {
+    font-size: 1.5em;
+    margin-right: 10px;
+    min-width: 40px;
+    text-align: center;
+}
+
+/* When showing only emoji without keywords */
+.emoji-suggestion-emoji:only-child {
+    margin: 0 10px;
+}
