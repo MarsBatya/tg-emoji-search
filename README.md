@@ -11,8 +11,10 @@ This plugin provides a fast and intuitive way to insert emojis into your Obsidia
    - Keywords are based on Telegram translations in multiple languages (currently hardcoded).
 
 2. **Multiple Language Support**  
-   - Switch the default language for keywords (e.g., English, Russian).
    - Uses data inspired by Telegram’s emoji translations.
+   - English keywords: ~4k, emojis: ~2k
+   - Russian keywords: ~5k, emojis: ~2k
+   - Total keywords: ~9k, emojis: ~2k
 
 3. **Fast Performance with Rust + WebAssembly**  
    - The core emoji search is implemented in Rust, compiled to WebAssembly for speed.
