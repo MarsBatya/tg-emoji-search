@@ -269,7 +269,7 @@ class EmojiSuggesterSettingTab extends PluginSettingTab {
 	display(): void {
 		const { containerEl } = this;
 		containerEl.empty();
-		containerEl.createEl('h2', { text: 'Advanced' });
+		new Setting(containerEl).setName('General').setHeading();
 
 		new Setting(containerEl)
 			.setName('Default language')
@@ -306,7 +306,7 @@ class EmojiSuggesterSettingTab extends PluginSettingTab {
 				}));
 
 		// Add section for custom emoji mappings
-		containerEl.createEl('h2', { text: 'Custom emoji mappings' });
+		new Setting(containerEl).setName('Custom emoji mappings').setHeading();
 
 		// Display existing custom mappings
 		const customMappingsContainer = containerEl.createDiv('custom-emoji-mappings-container');
