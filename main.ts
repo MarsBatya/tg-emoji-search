@@ -75,14 +75,14 @@ export default class EmojiSuggesterPlugin extends Plugin {
 			// new Notice('Emoji Suggester plugin loaded successfully');
 		} catch (error) {
 			console.error('Failed to initialize WASM:', error);
-			new Notice('Failed to initialize Emoji Suggester plugin');
+			new Notice('Failed to initialize Emoji suggester plugin');
 		}
 
 		// Add a settings tab for the plugin
 		this.addSettingTab(new EmojiSuggesterSettingTab(this.app, this));
 
 		// Create a ribbon icon with a tooltip
-		const ribbonIconEl = this.addRibbonIcon('smile', 'Emoji Suggester', () => {
+		const ribbonIconEl = this.addRibbonIcon('smile', 'Emoji suggester', () => {
 			new Notice(`Type "${this.settings.triggerChar}" followed by a keyword to suggest emojis`);
 		});
 		ribbonIconEl.addClass('emoji-suggester-ribbon-class');
@@ -272,7 +272,7 @@ class EmojiSuggesterSettingTab extends PluginSettingTab {
 		containerEl.createEl('h2', { text: 'Advanced' });
 
 		new Setting(containerEl)
-			.setName('Default Language')
+			.setName('Default language')
 			.setDesc('Choose the default language for emoji search')
 			.addDropdown(dropdown => dropdown
 				.addOption('english', 'English')
@@ -284,7 +284,7 @@ class EmojiSuggesterSettingTab extends PluginSettingTab {
 				}));
 
 		new Setting(containerEl)
-			.setName('Trigger Character')
+			.setName('Trigger character')
 			.setDesc('Character that triggers the emoji suggestions')
 			.addText(text => text
 				.setPlaceholder(':')
@@ -306,7 +306,7 @@ class EmojiSuggesterSettingTab extends PluginSettingTab {
 				}));
 
 		// Add section for custom emoji mappings
-		containerEl.createEl('h2', { text: 'Custom Emoji Mappings' });
+		containerEl.createEl('h2', { text: 'Custom emoji mappings' });
 
 		// Display existing custom mappings
 		const customMappingsContainer = containerEl.createDiv('custom-emoji-mappings-container');
@@ -350,7 +350,7 @@ class EmojiSuggesterSettingTab extends PluginSettingTab {
 
 		// Reset Custom Mappings button
 		new Setting(containerEl)
-			.setName('Reset Custom Emoji Mappings')
+			.setName('Reset custom emoji mappings')
 			.setDesc('Remove all your custom emoji mappings')
 			.addButton(button => button
 				.setButtonText('Reset')
@@ -363,7 +363,7 @@ class EmojiSuggesterSettingTab extends PluginSettingTab {
 
 
 		new Setting(containerEl)
-			.setName('Reset Emoji Popularity')
+			.setName('Reset emoji popularity')
 			.setDesc('Reset your emoji usage statistics')
 			.addButton(button => button
 				.setButtonText('Reset')
@@ -383,7 +383,7 @@ class EmojiSuggesterSettingTab extends PluginSettingTab {
 		// Display top 10 most used emojis
 		const topEmojisEl = containerEl.createDiv();
 		topEmojisEl.addClass('emoji-popularity-stats');
-		topEmojisEl.createEl('h2', { text: 'Your Most Used Emojis' });
+		topEmojisEl.createEl('h2', { text: 'Your most used emojis' });
 
 		const popularityEntries = Object.entries(this.plugin.settings.emojiPopularity);
 		popularityEntries.sort((a, b) => b[1] - a[1]);
