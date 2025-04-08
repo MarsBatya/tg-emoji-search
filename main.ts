@@ -147,7 +147,7 @@ class EmojiSuggester extends EditorSuggest<string> {
 		const line = editor.getLine(cursor.line);
 		const subString = line.substring(0, cursor.ch);
 		const escapedTrigger = this.settings.triggerChar.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-		const triggerRegex = new RegExp(`${escapedTrigger}([a-zA-Zа-яА-Я ]*)$`);
+		const triggerRegex = new RegExp(`${escapedTrigger}([a-zA-Zа-яА-Я][a-zA-Zа-яА-Я ]*)$`);
 		const match = subString.match(triggerRegex);
 		if (!match) return null;
 		return {
