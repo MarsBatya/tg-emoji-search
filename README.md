@@ -1,6 +1,9 @@
 # TG Emoji Search Plugin
 
-![demo](https://github.com/user-attachments/assets/22517d21-6493-430e-bd03-3b2cc6f41f1e)
+<img src="https://github.com/user-attachments/assets/e059f517-78b4-4734-b34e-3a5b102acdce" alt="some logo" width="200"/>
+
+## Simple demo
+<img src="https://github.com/user-attachments/assets/22517d21-6493-430e-bd03-3b2cc6f41f1e" alt="demo" width="600"/>
 
 This plugin provides a fast and intuitive way to insert emojis into your Obsidian notes. By typing a trigger character (":" by default) followed by a keyword, you get an instant suggestion list of matching emojis, complete with optional keyword hints. The plugin also includes a command to insert a random emoji, plus it tracks your most used emojis.
 
