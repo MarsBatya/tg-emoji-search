@@ -15,6 +15,7 @@ import {
 import init, { EmojiSearch } from './pkg/emoji_search_fixed.js';
 import emojiDataEnglish from "./emoji_data_english.json";
 import emojiDataRussian from "./emoji_data_russian.json";
+import emojiDataSpanish from "./emoji_data_spanish.json";
 import wasmDataUrl from "./pkg/emoji_search_bg.wasm";
 
 // --- Type Definitions ---
@@ -28,7 +29,7 @@ interface InitOutput {
 }
 
 interface EmojiSuggesterPluginSettings {
-	defaultLanguage: string;
+	chosenLanguages: string[];
 	triggerChar: string;
 	showKeywords: boolean;
 	emojiPopularity: Record<string, number>;
@@ -36,19 +37,24 @@ interface EmojiSuggesterPluginSettings {
 }
 
 const DEFAULT_SETTINGS: EmojiSuggesterPluginSettings = {
-	defaultLanguage: 'english',
+	chosenLanguages: ['english'],
 	triggerChar: ':',
 	showKeywords: true,
 	emojiPopularity: {},
 	customEmojiMappings: {},
 };
 
+const AVAILABLE_LANGUAGES = {
+	english: 'English',
+	russian: 'Russian',
+	spanish: 'Spanish'
+};
 
 const RANDOM_EMOJIS = ['😀', '😂', '🥰', '😎', '🤔', '👍', '🎉', '✨', '🔥', '❤️'];
 
 async function loadEmojiData() {
 	// The JSON is already inlined as objects
-	return { english: emojiDataEnglish, russian: emojiDataRussian };
+	return { english: emojiDataEnglish, russian: emojiDataRussian, spanish: emojiDataSpanish };
 }
 
 // --- Main Plugin Class ---
@@ -65,8 +71,7 @@ export default class EmojiSuggesterPlugin extends Plugin {
 
 			// Create instance of EmojiSearch and initialize with emoji data
 			this.emojiSearch = new EmojiSearch();
-			const emojiData = await loadEmojiData();
-			this.emojiSearch.initialize(JSON.stringify(emojiData));
+			await this.reinitializeEmojiSearch();
 			console.log('WASM initialized successfully with emoji data');
 			// Register editor suggestions using our custom suggester
 			this.registerEditorSuggest(new EmojiSuggester(this.app, this, this.emojiSearch));
@@ -98,6 +103,22 @@ export default class EmojiSuggesterPlugin extends Plugin {
 		});
 	}
 
+	async reinitializeEmojiSearch(): Promise<void> {
+		if (!this.emojiSearch) return;
+
+		const allEmojiData = await loadEmojiData();
+		const filteredData: Record<string, any> = {};
+
+		// Only include data for chosen languages
+		for (const lang of this.settings.chosenLanguages) {
+			if (allEmojiData[lang as keyof typeof allEmojiData]) {
+				filteredData[lang] = allEmojiData[lang as keyof typeof allEmojiData];
+			}
+		}
+
+		this.emojiSearch.initialize(JSON.stringify(filteredData));
+	}
+
 	async loadWasmModule(): Promise<InitOutput> {
 		try {
 			const wasmModule = await import('./pkg/emoji_search_fixed.js');
@@ -123,11 +144,23 @@ export default class EmojiSuggesterPlugin extends Plugin {
 	}
 
 	async loadSettings() {
-		this.settings = { ...DEFAULT_SETTINGS, ...(await this.loadData() || {}) };
+		const loadedSettings = await this.loadData() || {};
+
+		// Migration: convert old defaultLanguage to chosenLanguages
+		if (loadedSettings.defaultLanguage && !loadedSettings.chosenLanguages) {
+			loadedSettings.chosenLanguages = [loadedSettings.defaultLanguage];
+			delete loadedSettings.defaultLanguage;
+		}
+
+		this.settings = { ...DEFAULT_SETTINGS, ...loadedSettings };
 	}
 
 	async saveSettings() {
 		await this.saveData(this.settings);
+		// Reinitialize emoji search when settings change
+		if (this.emojiSearch) {
+			await this.reinitializeEmojiSearch();
+		}
 	}
 }
 
@@ -147,7 +180,7 @@ class EmojiSuggester extends EditorSuggest<string> {
 		const line = editor.getLine(cursor.line);
 		const subString = line.substring(0, cursor.ch);
 		const escapedTrigger = this.settings.triggerChar.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-		const triggerRegex = new RegExp(`${escapedTrigger}([a-zA-Zа-яА-Я][a-zA-Zа-яА-Я ]*)$`);
+		const triggerRegex = new RegExp(`${escapedTrigger}([a-zA-Zа-яА-Яñáéíóúü][a-zA-Zа-яА-Яñáéíóúü ]*)$`);
 		const match = subString.match(triggerRegex);
 		if (!match) return null;
 		return {
@@ -156,15 +189,31 @@ class EmojiSuggester extends EditorSuggest<string> {
 			query: match[1]?.trim() || ''
 		};
 	}
+
 	getSuggestions(context: EditorSuggestContext): string[] {
 		if (!context.query || !this.emojiSearch) return [];
-		const language = /[а-яА-Я]/.test(context.query)
-			? 'russian'
-			: this.settings.defaultLanguage;
 
 		try {
-			// Get results from the WASM module
-			const results: [string, string[]][] = JSON.parse(this.emojiSearch.search(context.query, language));
+			// Search across all chosen languages
+			// Detect language based on query characters and filter chosen languages
+			const detectedLanguages = this.settings.chosenLanguages.filter(lang => {
+				if (/[а-яА-Я]/.test(context.query)) {
+					return lang === 'russian';
+				} else if (/[ñáéíóúü¿¡]/.test(context.query)) {
+					return lang === 'spanish';
+				} else {
+					// Default to non-Cyrillic languages for Latin script
+					return lang !== 'russian';
+				}
+			});
+
+			// If no languages match the detected script, fall back to all chosen languages
+			const languagesToSearch = detectedLanguages.length > 0 ? detectedLanguages : this.settings.chosenLanguages;
+
+			// Search only the filtered languages
+			const results: [string, string[]][] = JSON.parse(
+				this.emojiSearch.search_multiple(context.query, JSON.stringify(languagesToSearch))
+			);
 			const emojiMap = new Map<string, string>();
 
 			// Add emojis from WASM search results
@@ -205,6 +254,7 @@ class EmojiSuggester extends EditorSuggest<string> {
 			return [];
 		}
 	}
+
 	renderSuggestion(value: string, el: HTMLElement): void {
 		el.empty();
 		if (this.settings.showKeywords) {
@@ -272,16 +322,50 @@ class EmojiSuggesterSettingTab extends PluginSettingTab {
 		new Setting(containerEl).setName('General').setHeading();
 
 		new Setting(containerEl)
-			.setName('Default language')
-			.setDesc('Choose the default language for emoji search')
-			.addDropdown(dropdown => dropdown
-				.addOption('english', 'English')
-				.addOption('russian', 'Russian')
-				.setValue(this.plugin.settings.defaultLanguage)
-				.onChange(async (value) => {
-					this.plugin.settings.defaultLanguage = value;
-					await this.plugin.saveSettings();
-				}));
+			.setName('Chosen languages')
+			.setDesc('Select which languages to enable for emoji search')
+			.setClass('emoji-language-setting');
+
+		// Create checkboxes for each available language
+		const languageContainer = containerEl.createDiv('language-checkbox-container');
+
+		for (const [langCode, langName] of Object.entries(AVAILABLE_LANGUAGES)) {
+			const checkboxContainer = languageContainer.createDiv('language-checkbox-item');
+
+			const checkbox = checkboxContainer.createEl('input');
+			checkbox.type = 'checkbox';
+			checkbox.id = `lang-${langCode}`;
+			checkbox.checked = this.plugin.settings.chosenLanguages.includes(langCode);
+
+			const label = checkboxContainer.createEl('label');
+			label.setAttribute('for', `lang-${langCode}`);
+			label.textContent = langName;
+
+			checkbox.addEventListener('change', async (e) => {
+				const target = e.target as HTMLInputElement;
+				if (target.checked) {
+					if (!this.plugin.settings.chosenLanguages.includes(langCode)) {
+						this.plugin.settings.chosenLanguages.push(langCode);
+					}
+				} else {
+					const index = this.plugin.settings.chosenLanguages.indexOf(langCode);
+					if (index > -1) {
+						this.plugin.settings.chosenLanguages.splice(index, 1);
+					}
+				}
+
+				// Ensure at least one language is selected
+				if (this.plugin.settings.chosenLanguages.length === 0) {
+					this.plugin.settings.chosenLanguages.push('english');
+					// Update the english checkbox
+					const englishCheckbox = containerEl.querySelector('#lang-english') as HTMLInputElement;
+					if (englishCheckbox) englishCheckbox.checked = true;
+					new Notice('At least one language must be selected. English has been re-enabled.');
+				}
+
+				await this.plugin.saveSettings();
+			});
+		}
 
 		new Setting(containerEl)
 			.setName('Trigger character')
@@ -408,10 +492,7 @@ class EmojiSuggesterSettingTab extends PluginSettingTab {
 				countSpan.addClass('emoji-top-count');
 				countSpan.textContent = `Used ${count} time${count !== 1 ? 's' : ''}`;
 			}
-
-		
 		}
-	
 	}
 	private renderCustomMappings(containerEl: HTMLElement): void {
 		containerEl.empty();

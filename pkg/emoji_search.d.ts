@@ -4,7 +4,12 @@ export class EmojiSearch {
   free(): void;
   constructor();
   initialize(emoji_data_json: string): void;
+  update_language(language_code: string, language_data_json: string): void;
+  remove_language(language_code: string): void;
   search(query: string, language: string): string;
+  search_multiple(query: string, languages_json: string): string;
+  get_languages(): string;
+  get_stats(): string;
 }
 
 export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembly.Module;
@@ -14,7 +19,12 @@ export interface InitOutput {
   readonly __wbg_emojisearch_free: (a: number, b: number) => void;
   readonly emojisearch_new: () => number;
   readonly emojisearch_initialize: (a: number, b: number, c: number) => [number, number];
+  readonly emojisearch_update_language: (a: number, b: number, c: number, d: number, e: number) => [number, number];
+  readonly emojisearch_remove_language: (a: number, b: number, c: number) => void;
   readonly emojisearch_search: (a: number, b: number, c: number, d: number, e: number) => [number, number];
+  readonly emojisearch_search_multiple: (a: number, b: number, c: number, d: number, e: number) => [number, number];
+  readonly emojisearch_get_languages: (a: number) => [number, number];
+  readonly emojisearch_get_stats: (a: number) => [number, number];
   readonly __wbindgen_export_0: WebAssembly.Table;
   readonly __wbindgen_malloc: (a: number, b: number) => number;
   readonly __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number;
