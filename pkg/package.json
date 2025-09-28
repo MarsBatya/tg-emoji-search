@@ -11,8 +11,5 @@
   "types": "emoji_search.d.ts",
   "sideEffects": [
     "./snippets/*"
-  ],
-  "devDependencies": {
-    "esbuild-plugin-copy": "^2.1.1"
-  }
+  ]
 }
