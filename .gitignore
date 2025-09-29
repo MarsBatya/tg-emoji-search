@@ -23,3 +23,6 @@ data.json
 
 # Exclude rust temp files
 target/*
+
+# Exclude script helpers
+scripts/*
