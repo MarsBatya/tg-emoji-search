@@ -34,6 +34,7 @@ interface EmojiSuggesterPluginSettings {
 	showKeywords: boolean;
 	emojiPopularity: Record<string, number>;
 	customEmojiMappings: Record<string, string>;
+	lazyLoadWasm: boolean;
 }
 
 const DEFAULT_SETTINGS: EmojiSuggesterPluginSettings = {
@@ -42,6 +43,7 @@ const DEFAULT_SETTINGS: EmojiSuggesterPluginSettings = {
 	showKeywords: true,
 	emojiPopularity: {},
 	customEmojiMappings: {},
+	lazyLoadWasm: true,
 };
 
 const AVAILABLE_LANGUAGES = {
@@ -65,8 +67,22 @@ export default class EmojiSuggesterPlugin extends Plugin {
 	async onload() {
 		await this.loadSettings();
 
+
+		if (!this.settings.lazyLoadWasm) {
+			try {
+				await this.loadWasmModule();
+				this.emojiSearch = new EmojiSearch();
+				await this.reinitializeEmojiSearch(this.emojiSearch);
+				console.log('Emoji suggester plugin initialized successfully');
+			} catch (error) {
+				console.error('Failed to initialize WASM:', error);
+				new Notice('Failed to initialize Emoji suggester plugin');
+			}
+		}
+
 		// Add a settings tab for the plugin
 		this.addSettingTab(new EmojiSuggesterSettingTab(this.app, this));
+		this.registerEditorSuggest(new EmojiSuggester(this.app, this, this.emojiSearch));
 
 		// Create a ribbon icon with a tooltip
 		const ribbonIconEl = this.addRibbonIcon('smile', 'Emoji suggester', () => {
@@ -83,8 +99,6 @@ export default class EmojiSuggesterPlugin extends Plugin {
 				editor.replaceSelection(randomEmoji);
 			}
 		});
-
-		this.registerEditorSuggest(new EmojiSuggester(this.app, this));
 	}
 
 	async reinitializeEmojiSearch(emojiSearch: EmojiSearch): Promise<void> {
@@ -150,14 +164,17 @@ class EmojiSuggester extends EditorSuggest<string> {
 	private wasmReady = false;
 	private initPromise: Promise<void> | null = null;
 
-	constructor(app: App, plugin: EmojiSuggesterPlugin) {
+	constructor(app: App, plugin: EmojiSuggesterPlugin, emojiSearch: EmojiSearch | null = null) {
 		super(app);
 		this.plugin = plugin;
 		this.settings = plugin.settings;
+		this.emojiSearch = emojiSearch;
+		this.wasmReady = this.emojiSearch != null;
 	}
 
 	private async ensureWasmReady(): Promise<void> {
 		if (this.wasmReady) return;
+		if (!this.plugin.settings.lazyLoadWasm) return;
 		if (this.initPromise) return this.initPromise;
 
 		this.initPromise = (async () => {
@@ -317,6 +334,17 @@ class EmojiSuggesterSettingTab extends PluginSettingTab {
 		const { containerEl } = this;
 		containerEl.empty();
 		new Setting(containerEl).setName('General').setHeading();
+
+		new Setting(containerEl)
+			.setName('Lazy load emoji engine')
+			.setDesc('Load the emoji search engine on first use instead of at startup. Reduces Obsidian startup time but adds a small delay the first time you trigger suggestions.')
+			.addToggle(toggle => toggle
+				.setValue(this.plugin.settings.lazyLoadWasm)
+				.onChange(async (value) => {
+					this.plugin.settings.lazyLoadWasm = value;
+					await this.plugin.saveSettings();
+					new Notice('Restart Obsidian for this change to take effect');
+				}));
 
 		new Setting(containerEl)
 			.setName('Chosen languages')
