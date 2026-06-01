@@ -65,24 +65,6 @@ export default class EmojiSuggesterPlugin extends Plugin {
 	async onload() {
 		await this.loadSettings();
 
-		try {
-			// Initialize WASM module using a binary fetch approach
-			await this.loadWasmModule();
-
-			// Create instance of EmojiSearch and initialize with emoji data
-			this.emojiSearch = new EmojiSearch();
-			await this.reinitializeEmojiSearch();
-			console.log('WASM initialized successfully with emoji data');
-			// Register editor suggestions using our custom suggester
-			this.registerEditorSuggest(new EmojiSuggester(this.app, this, this.emojiSearch));
-
-			// Uncomment to have a success notice:
-			// new Notice('Emoji Suggester plugin loaded successfully');
-		} catch (error) {
-			console.error('Failed to initialize WASM:', error);
-			new Notice('Failed to initialize Emoji suggester plugin');
-		}
-
 		// Add a settings tab for the plugin
 		this.addSettingTab(new EmojiSuggesterSettingTab(this.app, this));
 
@@ -101,22 +83,19 @@ export default class EmojiSuggesterPlugin extends Plugin {
 				editor.replaceSelection(randomEmoji);
 			}
 		});
+
+		this.registerEditorSuggest(new EmojiSuggester(this.app, this));
 	}
 
-	async reinitializeEmojiSearch(): Promise<void> {
-		if (!this.emojiSearch) return;
-
+	async reinitializeEmojiSearch(emojiSearch: EmojiSearch): Promise<void> {
 		const allEmojiData = await loadEmojiData();
 		const filteredData: Record<string, any> = {};
-
-		// Only include data for chosen languages
 		for (const lang of this.settings.chosenLanguages) {
 			if (allEmojiData[lang as keyof typeof allEmojiData]) {
 				filteredData[lang] = allEmojiData[lang as keyof typeof allEmojiData];
 			}
 		}
-
-		this.emojiSearch.initialize(JSON.stringify(filteredData));
+		emojiSearch.initialize(JSON.stringify(filteredData));
 	}
 
 	async loadWasmModule(): Promise<InitOutput> {
@@ -159,21 +138,36 @@ export default class EmojiSuggesterPlugin extends Plugin {
 		await this.saveData(this.settings);
 		// Reinitialize emoji search when settings change
 		if (this.emojiSearch) {
-			await this.reinitializeEmojiSearch();
+			await this.reinitializeEmojiSearch(this.emojiSearch);
 		}
 	}
 }
 
 class EmojiSuggester extends EditorSuggest<string> {
-	private emojiSearch: EmojiSearch;
+	private emojiSearch: EmojiSearch | null = null;
 	private settings: EmojiSuggesterPluginSettings;
 	private plugin: EmojiSuggesterPlugin;
+	private wasmReady = false;
+	private initPromise: Promise<void> | null = null;
 
-	constructor(app: App, plugin: EmojiSuggesterPlugin, emojiSearch: EmojiSearch) {
+	constructor(app: App, plugin: EmojiSuggesterPlugin) {
 		super(app);
 		this.plugin = plugin;
-		this.emojiSearch = emojiSearch;
 		this.settings = plugin.settings;
+	}
+
+	private async ensureWasmReady(): Promise<void> {
+		if (this.wasmReady) return;
+		if (this.initPromise) return this.initPromise;
+
+		this.initPromise = (async () => {
+			await this.plugin.loadWasmModule();
+			this.emojiSearch = new EmojiSearch();
+			await this.plugin.reinitializeEmojiSearch(this.emojiSearch);
+			console.log('WASM initialized successfully with emoji data');
+			this.wasmReady = true;
+		})();
+		return this.initPromise;
 	}
 
 	onTrigger(cursor: EditorPosition, editor: Editor): EditorSuggestTriggerInfo | null {
@@ -191,8 +185,11 @@ class EmojiSuggester extends EditorSuggest<string> {
 	}
 
 	getSuggestions(context: EditorSuggestContext): string[] {
+		if (!this.wasmReady || !this.emojiSearch) {
+			this.ensureWasmReady();
+			return [];
+		}
 		if (!context.query || !this.emojiSearch) return [];
-
 		try {
 			// Search across all chosen languages
 			// Detect language based on query characters and filter chosen languages
