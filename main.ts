@@ -84,12 +84,6 @@ export default class EmojiSuggesterPlugin extends Plugin {
 		this.addSettingTab(new EmojiSuggesterSettingTab(this.app, this));
 		this.registerEditorSuggest(new EmojiSuggester(this.app, this, this.emojiSearch));
 
-		// Create a ribbon icon with a tooltip
-		const ribbonIconEl = this.addRibbonIcon('smile', 'Emoji suggester', () => {
-			new Notice(`Type "${this.settings.triggerChar}" followed by a keyword to suggest emojis`);
-		});
-		ribbonIconEl.addClass('emoji-suggester-ribbon-class');
-
 		// Add command to insert a random emoji
 		this.addCommand({
 			id: 'insert-random-emoji',
@@ -97,7 +91,8 @@ export default class EmojiSuggesterPlugin extends Plugin {
 			editorCallback: (editor: Editor) => {
 				const randomEmoji = RANDOM_EMOJIS[Math.floor(Math.random() * RANDOM_EMOJIS.length)];
 				editor.replaceSelection(randomEmoji);
-			}
+			},
+			icon: 'hand-coins'
 		});
 	}
 
